@@ -1,0 +1,363 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { getDevUserId } from "@/lib/utils/dev-user";
+import { normalizeRating } from "@/lib/utils/rating";
+import RatingInput from "@/components/rating/RatingInput";
+import { Evaluation, Performance } from "@/types";
+import { getPerformanceCreators, formatCreators } from "@/lib/utils/performance-creators";
+import CreatorInfo from "@/components/performance/CreatorInfo";
+import Image from "next/image";
+import Toast from "@/components/ui/Toast";
+
+/**
+ * 내 평가 수정 화면
+ * - 선택한 공연의 평가를 수정할 수 있음
+ * - 평가 입력 화면과 유사한 UI
+ */
+export default function EditEvaluationPage() {
+  const router = useRouter();
+  const params = useParams();
+  const evaluationId = params.evaluationId as string;
+
+  const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [performance, setPerformance] = useState<Performance | null>(null);
+  const [starRating, setStarRating] = useState(0);
+  const [likeRating, setLikeRating] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "success" | "error"
+  >("idle");
+  const [posterUrl, setPosterUrl] = useState<string | null>(null);
+  const [creators, setCreators] = useState<{ writer: string | null; composer: string | null }>({
+    writer: null,
+    composer: null,
+  });
+  const [userId, setUserId] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+
+  // 사용자 ID 로드
+  useEffect(() => {
+    const id = getDevUserId();
+    setUserId(id ? id.substring(0, 8) : null);
+    if (!id) {
+      router.push("/dev/login");
+      return;
+    }
+  }, [router]);
+
+  useEffect(() => {
+    async function loadEvaluation() {
+      const currentUserId = getDevUserId();
+      if (!currentUserId) {
+        return;
+      }
+
+      try {
+        const supabase = createClient();
+        
+        // 평가 정보 조회
+        const { data: evaluationData, error: evalError } = await supabase
+          .from("evaluation")
+          .select("*")
+          .eq("id", evaluationId)
+          .eq("user_id", currentUserId)
+          .single();
+
+        if (evalError) throw evalError;
+        if (!evaluationData) {
+          router.push("/my-evaluations");
+          return;
+        }
+
+        const evaluationDataTyped = evaluationData as any;
+        setEvaluation(evaluationDataTyped);
+        setStarRating(evaluationDataTyped.star_rating);
+        setLikeRating(evaluationDataTyped.like_rating);
+
+        // Performance 정보 조회 (performance_id 직접 사용)
+        const performanceId = (evaluationDataTyped as any).performance_id;
+        if (!performanceId) {
+          router.push("/my-evaluations");
+          return;
+        }
+
+        const { data: performanceData, error: perfError } = await supabase
+          .from("performance")
+          .select("*")
+          .eq("id", performanceId)
+          .single();
+
+        if (perfError) throw perfError;
+        if (!performanceData) {
+          router.push("/my-evaluations");
+          return;
+        }
+
+        setPerformance(performanceData);
+
+        // 포스터 URL 로드: performance.poster_url 우선, 없으면 performance_season.poster_url
+        const perfTyped = performanceData as any;
+        let posterUrl: string | null = null;
+        
+        if (perfTyped.poster_url) {
+          posterUrl = perfTyped.poster_url;
+        } else {
+          // performance_season에서 poster_url 조회
+          const { data: seasons } = await supabase
+            .from("performance_season")
+            .select("poster_url")
+            .eq("performance_id", performanceId)
+            .limit(1);
+          
+          posterUrl = seasons?.[0]?.poster_url || null;
+        }
+
+        setPosterUrl(posterUrl);
+
+        // 작가/작곡가 정보 로드
+        const creatorsList = await getPerformanceCreators(supabase, performanceId);
+        setCreators(formatCreators(creatorsList));
+      } catch (error) {
+        console.error("Failed to load evaluation:", error);
+        router.push("/my-evaluations");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadEvaluation();
+  }, [evaluationId, router]);
+
+  const handleSave = async () => {
+    if (!evaluation) return;
+
+    setIsSaving(true);
+    setSaveStatus("saving");
+
+    try {
+      const supabase = createClient();
+      const normalizedStar = normalizeRating(starRating);
+      const normalizedLike = normalizeRating(likeRating);
+
+      const { error } = await (supabase
+        .from("evaluation") as any)
+        .update({
+          star_rating: normalizedStar,
+          like_rating: normalizedLike,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", evaluation.id);
+
+      if (error) throw error;
+
+      setSaveStatus("success");
+      setTimeout(() => {
+        router.push("/my-evaluations");
+      }, 1000);
+    } catch (error) {
+      console.error("Failed to save evaluation:", error);
+      setSaveStatus("error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleNotSeen = async () => {
+    if (!evaluation) return;
+
+    setIsSaving(true);
+    setSaveStatus("saving");
+
+    try {
+      const supabase = createClient();
+      
+      // 평가 삭제
+      const { error } = await supabase
+        .from("evaluation")
+        .delete()
+        .eq("id", evaluation.id);
+
+      if (error) throw error;
+
+      // 토스트 알림 표시
+      setShowToast(true);
+      
+      // 약간의 딜레이 후 내 평가 화면으로 이동
+      setTimeout(() => {
+        router.push("/my-evaluations");
+      }, 1500);
+    } catch (error) {
+      console.error("Failed to delete evaluation:", error);
+      setSaveStatus("error");
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-zinc-600">로딩 중...</p>
+      </div>
+    );
+  }
+
+  if (!evaluation || !performance) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* 상단 ID 표시 */}
+      {userId && (
+        <div className="px-4 pt-4 pb-2">
+          <p className="text-sm text-zinc-600">ID: {userId}</p>
+        </div>
+      )}
+
+      {/* 뒤로가기 버튼 */}
+      <div className="px-4 pt-2 pb-4">
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center text-sm text-zinc-600 hover:text-zinc-900"
+        >
+          <svg
+            className="mr-1 h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          뒤로
+        </button>
+      </div>
+
+      {/* 포스터 이미지 */}
+      <div className="mb-6 px-4">
+        <div className="mx-auto max-w-xs">
+          <PosterImage posterUrl={posterUrl} title={performance.title} />
+        </div>
+      </div>
+
+      {/* 평가 입력 영역 */}
+      <div className="px-4 pb-24">
+        <div className="mx-auto max-w-md">
+          <h1 className="mb-2 text-2xl font-bold text-black">{performance.title}</h1>
+          
+          {/* 극본/작곡 정보 */}
+          <div className="mb-6">
+            <CreatorInfo
+              writer={creators.writer}
+              composer={creators.composer}
+            />
+          </div>
+
+          <div className="space-y-6">
+            <RatingInput
+              label="잘 만들었나요?"
+              value={starRating}
+              onChange={setStarRating}
+              icon="star"
+              disabled={isSaving}
+            />
+
+            <RatingInput
+              label="좋아하나요?"
+              value={likeRating}
+              onChange={setLikeRating}
+              icon="heart"
+              disabled={isSaving}
+            />
+          </div>
+
+          {/* 안봤어요 버튼 */}
+          <button
+            onClick={handleNotSeen}
+            className="mt-4 text-sm text-zinc-500 hover:text-zinc-700"
+            disabled={isSaving}
+          >
+            안봤어요
+          </button>
+
+          {saveStatus === "error" && (
+            <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              저장 중 오류가 발생했습니다.
+            </div>
+          )}
+
+          {saveStatus === "success" && (
+            <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+              저장되었습니다!
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 하단 버튼 */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white p-4">
+        <button
+          onClick={handleSave}
+          disabled={isSaving || starRating === 0 || likeRating === 0}
+          className="w-full rounded-lg bg-black px-6 py-4 text-base font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isSaving ? "저장 중..." : "평가 완료"}
+        </button>
+      </div>
+
+      {/* 토스트 알림 */}
+      <Toast
+        message="공연 평가가 삭제되었습니다"
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
+    </div>
+  );
+}
+
+function PosterImage({
+  posterUrl,
+  title,
+}: {
+  posterUrl: string | null;
+  title: string;
+}) {
+  return (
+    <div className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-zinc-200">
+      {posterUrl ? (
+        <Image
+          src={posterUrl}
+          alt={title}
+          width={400}
+          height={600}
+          className="h-full w-full object-cover"
+          unoptimized
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-100 to-zinc-200">
+          <svg
+            className="h-16 w-16 text-zinc-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}

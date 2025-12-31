@@ -1,41 +1,112 @@
-<<<<<<< HEAD
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# ShowRate - 공연 평가 플랫폼
 
-## Getting Started
+무대 공연(뮤지컬, 연극)을 평가하고 공유하는 모바일 우선 웹 애플리케이션입니다.
 
-First, run the development server:
+## 기술 스택
+
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript
+- **Database**: Supabase (PostgreSQL)
+- **Styling**: Tailwind CSS
+- **Deployment**: Vercel
+
+## 주요 기능
+
+- 공연 평가 시스템
+  - `star_rating` (0-5, 0.5 단위): 예술적 품질 평가
+  - `like_rating` (0-5, 0.5 단위): 개인적 선호도 평가
+- 공연 시즌 관리
+- 장소(Venue)별 공연 관리
+- 로그인 사용자 및 게스트 평가 지원
+
+## 시작하기
+
+### 1. 의존성 설치
+
+```bash
+npm install
+```
+
+### 2. 환경 변수 설정
+
+프로젝트 루트에 `.env.local` 파일을 생성하고 다음 내용을 추가하세요:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Supabase 프로젝트 설정 페이지에서 URL과 Anon Key를 확인할 수 있습니다:
+https://app.supabase.com/project/_/settings/api
+
+### 3. 개발 서버 실행
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 확인하세요.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## 프로젝트 구조
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+showrate-web/
+├── app/                    # Next.js App Router 페이지 및 레이아웃
+│   ├── layout.tsx         # 루트 레이아웃
+│   ├── page.tsx           # 홈 페이지 (공연 목록)
+│   └── globals.css        # 전역 스타일
+├── lib/                   # 유틸리티 및 라이브러리
+│   └── supabase/          # Supabase 클라이언트
+│       ├── server.ts      # 서버 컴포넌트용 클라이언트
+│       └── client.ts      # 클라이언트 컴포넌트용 클라이언트
+├── types/                  # TypeScript 타입 정의
+│   ├── database.ts        # 데이터베이스 스키마 타입
+│   └── index.ts           # 애플리케이션 타입
+└── public/                 # 정적 파일
+```
 
-## Learn More
+## 데이터베이스 구조
 
-To learn more about Next.js, take a look at the following resources:
+데이터베이스 ERD는 `showrate-erd.md` 파일을 참고하세요.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+주요 테이블:
+- `performance`: 공연 정보
+- `performance_season`: 공연 시즌 정보
+- `venue`: 공연장 정보
+- `evaluation`: 평가 정보
+- `user`: 로그인 사용자
+- `guest`: 게스트 사용자
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 개발 가이드
 
-## Deploy on Vercel
+### Supabase 클라이언트 사용
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**서버 컴포넌트에서:**
+```typescript
+import { createClient } from "@/lib/supabase/server";
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-=======
-# showrate-web
-공연 평가 웹 서비스
->>>>>>> cac48486800b7f0579372af02c1a74d0bf13c9cd
+export default async function Page() {
+  const supabase = createClient();
+  const { data } = await supabase.from("performance").select("*");
+  // ...
+}
+```
+
+**클라이언트 컴포넌트에서:**
+```typescript
+"use client";
+import { createClient } from "@/lib/supabase/client";
+
+export default function Component() {
+  const supabase = createClient();
+  // ...
+}
+```
+
+## 배포
+
+Vercel에 배포할 때는 환경 변수를 Vercel 프로젝트 설정에 추가하세요.
+
+## 라이선스
+
+Private
