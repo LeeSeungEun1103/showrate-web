@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { getDevUserId } from "@/lib/utils/dev-user";
+import { Database } from "@/types/database";
 import { Performance, Evaluation } from "@/types";
 import GlobalNav from "@/components/layout/GlobalNav";
 import Header from "@/components/layout/Header";
@@ -18,7 +19,7 @@ import RatingDisplay from "@/components/ui/RatingDisplay";
 import { cn } from "@/lib/utils/cn";
 
 interface EvaluationWithPerformance extends Evaluation {
-  performance: Performance & { poster_url?: string | null };
+  performance: Performance;
   writer: string | null;
   composer: string | null;
 }
@@ -96,7 +97,7 @@ export default function MyEvaluationsPage() {
                 .from("performance")
                 .select("*")
                 .eq("id", performanceId)
-                .single();
+                .single<Database["public"]["Tables"]["performance"]["Row"]>();
 
               if (performance) {
                 const creatorsList = await getPerformanceCreators(supabase, performanceId);
@@ -116,33 +117,16 @@ export default function MyEvaluationsPage() {
               .from("performance")
               .select("*")
               .eq("id", performanceId)
-              .single();
+              .single<Database["public"]["Tables"]["performance"]["Row"]>();
 
             if (performance) {
-              // 포스터 URL 로드
-              let posterUrl: string | null = null;
-              const perfTyped = performance as any;
-              if (perfTyped.poster_url) {
-                posterUrl = perfTyped.poster_url;
-              } else {
-                const { data: seasons } = await supabase
-                  .from("performance_season")
-                  .select("poster_url")
-                  .eq("performance_id", performanceId)
-                  .limit(1);
-                posterUrl = seasons?.[0]?.poster_url || null;
-              }
-              
               // 작가/작곡가 정보 조회
               const creatorsList = await getPerformanceCreators(supabase, performanceId);
               const creators = formatCreators(creatorsList);
               
               performanceMap.set(performanceId, {
                 ...evalTyped,
-                performance: {
-                  ...performance,
-                  poster_url: posterUrl,
-                },
+                performance,
                 writer: creators.writer,
                 composer: creators.composer,
               });

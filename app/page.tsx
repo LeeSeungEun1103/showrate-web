@@ -58,42 +58,8 @@ export default function HomePage() {
           (data || []).map(async (performance) => {
             const perfTyped = performance as any;
             
-            // 포스터 URL 로드: performance.poster_url 우선, 없으면 performance_season.poster_url
-            let posterUrl: string | null = null;
-            if (perfTyped.poster_url) {
-              posterUrl = perfTyped.poster_url;
-            } else {
-              const { data: seasons } = await supabase
-                .from("performance_season")
-                .select("poster_url")
-                .eq("performance_id", perfTyped.id)
-                .limit(1);
-              posterUrl = seasons?.[0]?.poster_url || null;
-            }
-            
-            // 해당 공연의 season 찾기
-            const { data: seasons } = await supabase
-              .from("performance_season")
-              .select("id")
-              .eq("performance_id", perfTyped.id);
-
-            const seasonIds = seasons?.map((s) => (s as any).id) || [];
-
-            if (seasonIds.length === 0) {
-              // 작가/작곡가 정보 조회
-              const creatorsList = await getPerformanceCreators(supabase, perfTyped.id);
-              const creators = formatCreators(creatorsList);
-              
-              return {
-                ...perfTyped,
-                evaluation_count: 0,
-                avg_star_rating: null,
-                avg_like_rating: null,
-                writer: creators.writer,
-                composer: creators.composer,
-                poster_url: posterUrl,
-              };
-            }
+            // 포스터 URL 로드: performance.poster_url만 사용
+            const posterUrl: string | null = perfTyped.poster_url ?? null;
 
             // 평가 통계 계산 (performance_id 기준, season 무시)
             const { data: evaluations } = await supabase

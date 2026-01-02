@@ -53,18 +53,21 @@ export interface Database {
           id: string; // uuid
           title: string;
           description: string | null;
+          poster_url: string | null;
           created_at: string; // timestamp
         };
         Insert: {
           id?: string;
           title: string;
           description?: string | null;
+          poster_url?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           title?: string;
           description?: string | null;
+          poster_url?: string | null;
           created_at?: string;
         };
       };
@@ -162,7 +165,8 @@ export interface Database {
           id: string; // uuid
           user_id: string | null; // uuid (FK, nullable)
           guest_id: string | null; // uuid (FK, nullable)
-          season_id: string; // uuid (FK)
+          performance_id: string; // uuid (FK)
+          season_id: string | null; // uuid (FK, nullable for MVP)
           star_rating: number; // numeric (0-5, 0.5 increments)
           like_rating: number; // numeric (0-5, 0.5 increments)
           comment: string | null;
@@ -173,7 +177,8 @@ export interface Database {
           id?: string;
           user_id?: string | null;
           guest_id?: string | null;
-          season_id: string;
+          performance_id: string;
+          season_id?: string | null;
           star_rating: number;
           like_rating: number;
           comment?: string | null;
@@ -184,7 +189,8 @@ export interface Database {
           id?: string;
           user_id?: string | null;
           guest_id?: string | null;
-          season_id?: string;
+          performance_id?: string;
+          season_id?: string | null;
           star_rating?: number;
           like_rating?: number;
           comment?: string | null;

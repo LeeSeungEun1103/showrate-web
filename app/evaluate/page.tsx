@@ -94,23 +94,8 @@ export default function EvaluatePage() {
         const creatorsData: Record<string, { writer: string | null; composer: string | null }> = {};
 
         for (const performance of allPerfsData) {
-          // 포스터 URL 로드: performance.poster_url 우선, 없으면 performance_season.poster_url
-          let posterUrl: string | null = null;
-          
-          // 1순위: performance 테이블의 poster_url
-          if (performance.poster_url) {
-            posterUrl = performance.poster_url;
-          } else {
-            // 2순위: performance_season 테이블의 poster_url
-            const { data: seasons } = await supabase
-              .from("performance_season")
-              .select("poster_url")
-              .eq("performance_id", performance.id)
-              .limit(1)
-              .returns<{ poster_url: string | null }[]>();
-
-            posterUrl = seasons?.[0]?.poster_url || null;
-          }
+          // 포스터 URL 로드: performance.poster_url만 사용
+          const posterUrl: string | null = performance.poster_url ?? null;
 
           urls[performance.id] = posterUrl;
           console.log(`[Poster] Performance ${performance.id} (${performance.title}): poster_url =`, posterUrl);

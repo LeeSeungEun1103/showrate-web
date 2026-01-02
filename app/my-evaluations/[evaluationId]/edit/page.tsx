@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { getDevUserId } from "@/lib/utils/dev-user";
 import { normalizeRating } from "@/lib/utils/rating";
 import RatingInput from "@/components/rating/RatingInput";
-import { Evaluation, Performance } from "@/types";
+import { Database } from "@/types/database";
+import { EvaluationUpdate, EvaluationRow, PerformanceRow } from "@/types/supabase";
 import { getPerformanceCreators, formatCreators } from "@/lib/utils/performance-creators";
 import CreatorInfo from "@/components/performance/CreatorInfo";
 import Button from "@/components/ui/Button";
@@ -24,8 +25,8 @@ export default function EditEvaluationPage() {
   const params = useParams();
   const evaluationId = params.evaluationId as string;
 
-  const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
-  const [performance, setPerformance] = useState<Performance | null>(null);
+  const [evaluation, setEvaluation] = useState<EvaluationRow | null>(null);
+  const [performance, setPerformance] = useState<PerformanceRow | null>(null);
   const [starRating, setStarRating] = useState(0);
   const [likeRating, setLikeRating] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,12 +63,13 @@ export default function EditEvaluationPage() {
         const supabase = createClient();
         
         // 평가 정보 조회
+        // .single<EvaluationRow>()로 명시적 타입 지정하여 never 타입 방지
         const { data: evaluationData, error: evalError } = await supabase
           .from("evaluation")
           .select("*")
           .eq("id", evaluationId)
           .eq("user_id", currentUserId)
-          .single();
+          .single<EvaluationRow>();
 
         if (evalError) throw evalError;
         if (!evaluationData) {
@@ -75,23 +77,24 @@ export default function EditEvaluationPage() {
           return;
         }
 
-        const evaluationDataTyped = evaluationData as any;
-        setEvaluation(evaluationDataTyped);
-        setStarRating(evaluationDataTyped.star_rating);
-        setLikeRating(evaluationDataTyped.like_rating);
+        // Supabase에서 반환된 데이터를 직접 사용 (타입 안전)
+        setEvaluation(evaluationData);
+        setStarRating(evaluationData.star_rating);
+        setLikeRating(evaluationData.like_rating);
 
         // Performance 정보 조회 (performance_id 직접 사용)
-        const performanceId = (evaluationDataTyped as any).performance_id;
+        const performanceId = evaluationData.performance_id;
         if (!performanceId) {
           router.push("/my-evaluations");
           return;
         }
 
+        // Load performance data - poster_url from performance table only
         const { data: performanceData, error: perfError } = await supabase
           .from("performance")
           .select("*")
           .eq("id", performanceId)
-          .single();
+          .single<PerformanceRow>();
 
         if (perfError) throw perfError;
         if (!performanceData) {
@@ -99,26 +102,11 @@ export default function EditEvaluationPage() {
           return;
         }
 
+        // Supabase에서 반환된 데이터를 직접 사용 (타입 안전)
         setPerformance(performanceData);
 
-        // 포스터 URL 로드: performance.poster_url 우선, 없으면 performance_season.poster_url
-        const perfTyped = performanceData as any;
-        let posterUrl: string | null = null;
-        
-        if (perfTyped.poster_url) {
-          posterUrl = perfTyped.poster_url;
-        } else {
-          // performance_season에서 poster_url 조회
-          const { data: seasons } = await supabase
-            .from("performance_season")
-            .select("poster_url")
-            .eq("performance_id", performanceId)
-            .limit(1);
-          
-          posterUrl = seasons?.[0]?.poster_url || null;
-        }
-
-        setPosterUrl(posterUrl);
+        // 포스터 URL 로드: performance.poster_url만 사용 (null 허용)
+        setPosterUrl(performanceData.poster_url);
 
         // 작가/작곡가 정보 로드
         const creatorsList = await getPerformanceCreators(supabase, performanceId);
@@ -145,13 +133,25 @@ export default function EditEvaluationPage() {
       const normalizedStar = normalizeRating(starRating);
       const normalizedLike = normalizeRating(likeRating);
 
+      // EvaluationUpdate 타입으로 명시적 지정 (never 타입 방지)
+      const updateData: EvaluationUpdate = {
+        star_rating: normalizedStar,
+        like_rating: normalizedLike,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Supabase의 타입 추론 문제 해결
+      // updateData는 이미 EvaluationUpdate 타입으로 지정되어 있음
+      // @supabase/ssr의 createBrowserClient가 타입을 제대로 추론하지 못하는 경우,
+      // 명시적으로 타입을 지정해야 합니다
+      type EvaluationTable = Database["public"]["Tables"]["evaluation"];
       const { error } = await (supabase
-        .from("evaluation") as any)
-        .update({
-          star_rating: normalizedStar,
-          like_rating: normalizedLike,
-          updated_at: new Date().toISOString(),
+        .from("evaluation") as unknown as {
+          update: (values: EvaluationTable["Update"]) => {
+            eq: (column: string, value: string) => Promise<{ error: any }>;
+          };
         })
+        .update(updateData)
         .eq("id", evaluation.id);
 
       if (error) throw error;

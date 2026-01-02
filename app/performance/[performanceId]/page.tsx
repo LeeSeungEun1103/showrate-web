@@ -33,16 +33,10 @@ export default async function PerformanceDetailPage({
     notFound();
   }
 
-  const performanceTyped = performance as any;
+  const performanceTyped = performance as Performance;
 
-  // 포스터 이미지 URL (performance_season에서 가져오거나 null)
-  const { data: seasons } = await supabase
-    .from("performance_season")
-    .select("poster_url")
-    .eq("performance_id", performanceId)
-    .limit(1);
-
-  const posterUrl = (seasons?.[0] as any)?.poster_url || null;
+  // 포스터 이미지 URL: performance.poster_url만 사용
+  const posterUrl: string | null = performanceTyped.poster_url ?? null;
 
   // 작가/작곡가 정보 조회
   const creatorsList = await getPerformanceCreators(supabase, performanceId);
