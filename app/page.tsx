@@ -5,8 +5,15 @@ import { createClient } from "@/lib/supabase/client";
 import { Performance } from "@/types";
 import Link from "next/link";
 import GlobalNav from "@/components/layout/GlobalNav";
+import Header from "@/components/layout/Header";
+import SearchInput from "@/components/ui/SearchInput";
+import FilterButton from "@/components/ui/FilterButton";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
 import { getDevUserId } from "@/lib/utils/dev-user";
 import { getPerformanceCreators, formatCreators } from "@/lib/utils/performance-creators";
+import { Star, Heart, Plus } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 
 interface PerformanceWithStats extends Performance {
   evaluation_count: number;
@@ -219,92 +226,45 @@ export default function HomePage() {
     <div className="min-h-screen bg-white pb-20">
       <main className="mx-auto max-w-md px-4 py-6">
         {/* 헤더 */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            {userId && (
-              <p className="text-sm text-zinc-600">ID: {userId}</p>
-            )}
-            <h1 className="text-2xl font-bold text-black">전체 평가</h1>
-            <div className="w-16" /> {/* 공간 맞추기 */}
-          </div>
-        </div>
+        <Header
+          userId={userId || undefined}
+          title="ShowRate"
+          showLogout={false}
+        />
 
         {/* 검색 바 */}
         <div className="mb-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Q 공연 검색"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 pl-10 text-sm focus:border-zinc-500 focus:outline-none"
-            />
-            <svg
-              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
+          <SearchInput
+            placeholder="공연 검색"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
 
         {/* 정렬 버튼 */}
         <div className="mb-4 flex items-center gap-2">
-          <button
+          <FilterButton
+            active={sortType === "star_high"}
+            star="up"
             onClick={() => setSortType("star_high")}
-            className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              sortType === "star_high"
-                ? "bg-zinc-900 text-white"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-            }`}
-          >
-            <span>★</span>
-            <span>↑</span>
-          </button>
-          <button
+          />
+          <FilterButton
+            active={sortType === "heart_high"}
+            heart="up"
             onClick={() => setSortType("heart_high")}
-            className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              sortType === "heart_high"
-                ? "bg-zinc-900 text-white"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-            }`}
-          >
-            <span>♥</span>
-            <span>↑</span>
-          </button>
-          <button
+          />
+          <FilterButton
+            active={sortType === "star_low_heart_high"}
+            star="down"
+            heart="up"
             onClick={() => setSortType("star_low_heart_high")}
-            className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              sortType === "star_low_heart_high"
-                ? "bg-zinc-900 text-white"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-            }`}
-          >
-            <span>★</span>
-            <span>↓</span>
-            <span>♥</span>
-            <span>↑</span>
-          </button>
-          <button
+          />
+          <FilterButton
+            active={sortType === "star_high_heart_low"}
+            star="up"
+            heart="down"
             onClick={() => setSortType("star_high_heart_low")}
-            className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              sortType === "star_high_heart_low"
-                ? "bg-zinc-900 text-white"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-            }`}
-          >
-            <span>★</span>
-            <span>↑</span>
-            <span>♥</span>
-            <span>↓</span>
-          </button>
+          />
         </div>
 
         {/* 공연 목록 */}
@@ -326,17 +286,18 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* 평가하기 버튼 */}
-        <div className="mt-8">
-          <Link
-            href="/evaluate"
-            className="block w-full rounded-lg bg-black px-6 py-4 text-center text-base font-medium text-white transition-colors hover:bg-zinc-800"
-          >
-            공연 평가하기
-          </Link>
-        </div>
       </main>
       <GlobalNav />
+      
+      {/* 플로팅 평가하기 버튼 */}
+      <Link
+        href="/evaluate"
+        className="fixed bottom-24 right-4 z-40 flex items-center gap-2 rounded-full bg-black px-4 py-3 text-sm font-medium text-white shadow-lg transition-transform hover:scale-105"
+        aria-label="공연 평가하기"
+      >
+        <Plus className="h-5 w-5" />
+        <span>공연 평가하기</span>
+      </Link>
     </div>
   );
 }
@@ -348,10 +309,17 @@ function PerformanceCard({
   performance: PerformanceWithStats;
   index: number;
 }) {
+  const isTopThree = index <= 3;
+  
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4">
+    <div className="border-b border-zinc-100 py-4 first:pt-0">
       <div className="flex items-start gap-3">
-        <span className="text-sm font-medium text-zinc-400">{index}</span>
+        <span className={cn(
+          "text-lg font-bold",
+          isTopThree ? "text-rose-500" : "text-zinc-400"
+        )}>
+          {index}
+        </span>
         {/* 포스터 이미지 */}
         <div className="relative h-20 w-14 flex-shrink-0 overflow-hidden rounded bg-zinc-200">
           {performance.poster_url ? (
@@ -391,24 +359,24 @@ function PerformanceCard({
               )}
             </div>
           )}
-          {performance.description && (
-            <p className="mt-1 line-clamp-2 text-sm text-zinc-600">
-              {performance.description}
-            </p>
-          )}
-          <div className="mt-3 flex items-center gap-4 text-xs text-zinc-500">
-            <span>평가 {performance.evaluation_count}개</span>
+          <div className="mt-3 flex items-center gap-4">
+            <span className="text-xs text-zinc-500">평균</span>
             {performance.avg_star_rating !== null && (
               <span className="flex items-center gap-1">
-                <span className="text-yellow-400">⭐</span>
-                <span>{performance.avg_star_rating.toFixed(1)}</span>
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <span className="text-base font-bold text-black">
+                  {performance.avg_star_rating.toFixed(1)}
+                </span>
               </span>
             )}
             {performance.avg_like_rating !== null && (
               <span className="flex items-center gap-1">
-                <span className="text-red-400">❤️</span>
-                <span>
-                  {performance.avg_like_rating.toFixed(1)} ({performance.evaluation_count}명)
+                <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+                <span className="text-base font-bold text-black">
+                  {performance.avg_like_rating.toFixed(1)}
+                </span>
+                <span className="text-xs text-zinc-500">
+                  ({performance.evaluation_count}명)
                 </span>
               </span>
             )}

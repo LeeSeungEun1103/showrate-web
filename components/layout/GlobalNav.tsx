@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Crown, User, MessageCircleQuestion } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 
 /**
  * 전역 네비게이션 바 (GNB)
  * 홈 화면 / 내 평가 화면 이동
+ * Figma 디자인 기준: 하단 고정, 3개 탭 (전체 평가, 내 평가, 공연추가 요청/피드백)
  */
 export default function GlobalNav() {
   const pathname = usePathname();
@@ -18,51 +21,42 @@ export default function GlobalNav() {
       <div className="mx-auto flex max-w-md items-center justify-around">
         <Link
           href="/"
-          className={`flex flex-1 flex-col items-center gap-1 px-4 py-3 transition-colors ${
+          className={cn(
+            "flex flex-1 flex-col items-center gap-1 px-4 py-3 transition-colors",
             isHome
               ? "text-black"
               : "text-zinc-400 hover:text-zinc-600"
-          }`}
+          )}
         >
-          <svg
-            className="h-6 w-6"
-            fill={isHome ? "currentColor" : "none"}
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-            />
-          </svg>
-          <span className="text-xs font-medium">홈</span>
+          <Crown className={cn("h-6 w-6", isHome && "fill-current")} />
+          <span className="text-xs font-medium">전체 평가</span>
         </Link>
 
         <Link
           href="/my-evaluations"
-          className={`flex flex-1 flex-col items-center gap-1 px-4 py-3 transition-colors ${
+          className={cn(
+            "flex flex-1 flex-col items-center gap-1 px-4 py-3 transition-colors",
             isMyEvaluations
               ? "text-black"
               : "text-zinc-400 hover:text-zinc-600"
-          }`}
+          )}
         >
-          <svg
-            className="h-6 w-6"
-            fill={isMyEvaluations ? "currentColor" : "none"}
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-            />
-          </svg>
+          <User className={cn("h-6 w-6", isMyEvaluations && "fill-current")} />
           <span className="text-xs font-medium">내 평가</span>
         </Link>
+
+        {/* 공연추가 요청/피드백 (향후 구현) */}
+        <button
+          className="flex flex-1 flex-col items-center gap-1 px-4 py-3 text-zinc-400 transition-colors hover:text-zinc-600"
+          disabled
+          onClick={() => {
+            // TODO: 구글 설문 링크 열기
+            window.open("https://forms.gle/...", "_blank");
+          }}
+        >
+          <MessageCircleQuestion className="h-6 w-6" />
+          <span className="text-xs font-medium">공연추가 요청/피드백</span>
+        </button>
       </div>
     </nav>
   );

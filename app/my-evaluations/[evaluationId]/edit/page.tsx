@@ -9,8 +9,10 @@ import RatingInput from "@/components/rating/RatingInput";
 import { Evaluation, Performance } from "@/types";
 import { getPerformanceCreators, formatCreators } from "@/lib/utils/performance-creators";
 import CreatorInfo from "@/components/performance/CreatorInfo";
+import Button from "@/components/ui/Button";
 import Image from "next/image";
 import Toast from "@/components/ui/Toast";
+import { ArrowLeft } from "lucide-react";
 
 /**
  * 내 평가 수정 화면
@@ -222,39 +224,27 @@ export default function EditEvaluationPage() {
       <div className="px-4 pt-2 pb-4">
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center text-sm text-zinc-600 hover:text-zinc-900"
+          className="inline-flex items-center text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
         >
-          <svg
-            className="mr-1 h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
+          <ArrowLeft className="mr-1 h-4 w-4" />
           뒤로
         </button>
       </div>
 
       {/* 포스터 이미지 */}
-      <div className="mb-6 px-4">
-        <div className="mx-auto max-w-xs">
+      <div className="mb-6 px-4 flex justify-center">
+        <div className="w-full max-w-sm">
           <PosterImage posterUrl={posterUrl} title={performance.title} />
         </div>
       </div>
 
       {/* 평가 입력 영역 */}
       <div className="px-4 pb-24">
-        <div className="mx-auto max-w-md">
+        <div className="mx-auto max-w-md text-center">
           <h1 className="mb-2 text-2xl font-bold text-black">{performance.title}</h1>
           
           {/* 극본/작곡 정보 */}
-          <div className="mb-6">
+          <div className="mb-6 flex justify-center">
             <CreatorInfo
               writer={creators.writer}
               composer={creators.composer}
@@ -262,21 +252,25 @@ export default function EditEvaluationPage() {
           </div>
 
           <div className="space-y-6">
-            <RatingInput
-              label="잘 만들었나요?"
-              value={starRating}
-              onChange={setStarRating}
-              icon="star"
-              disabled={isSaving}
-            />
+            <div className="flex justify-center">
+              <RatingInput
+                label="잘 만들었나요?"
+                value={starRating}
+                onChange={setStarRating}
+                icon="star"
+                disabled={isSaving}
+              />
+            </div>
 
-            <RatingInput
-              label="좋아하나요?"
-              value={likeRating}
-              onChange={setLikeRating}
-              icon="heart"
-              disabled={isSaving}
-            />
+            <div className="flex justify-center">
+              <RatingInput
+                label="좋아하나요?"
+                value={likeRating}
+                onChange={setLikeRating}
+                icon="heart"
+                disabled={isSaving}
+              />
+            </div>
           </div>
 
           {/* 안봤어요 버튼 */}
@@ -304,13 +298,15 @@ export default function EditEvaluationPage() {
 
       {/* 하단 버튼 */}
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white p-4">
-        <button
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
           onClick={handleSave}
           disabled={isSaving || starRating === 0 || likeRating === 0}
-          className="w-full rounded-lg bg-black px-6 py-4 text-base font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSaving ? "저장 중..." : "평가 완료"}
-        </button>
+        </Button>
       </div>
 
       {/* 토스트 알림 */}
@@ -344,7 +340,7 @@ function PosterImage({
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-100 to-zinc-200">
           <svg
-            className="h-16 w-16 text-zinc-400"
+            className="h-24 w-24 text-zinc-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

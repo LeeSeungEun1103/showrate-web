@@ -81,10 +81,10 @@ export default function RatingInput({
 
   return (
     <div className="w-full">
-      <label className="mb-3 block text-base font-medium text-black">
+      <label className="mb-3 block text-center text-base font-medium text-black">
         {label}
       </label>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center gap-2">
         {Array.from({ length: totalIcons }).map((_, index) => {
           const state = getIconState(index);
 
@@ -143,47 +143,42 @@ function StarIcon({ state, index }: { state: "filled" | "half" | "empty"; index:
   }
 
   if (state === "half") {
+    // 0.5점: 회색 배경 + 색상 반만 채워진 상태
     return (
-      <svg
-        className="h-10 w-10 text-yellow-400"
-        fill="currentColor"
-        viewBox="0 0 20 20"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="50%" stopColor="currentColor" />
-            <stop offset="50%" stopColor="transparent" stopOpacity="1" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-          fill={`url(#${gradientId})`}
-        />
-        <path
-          d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.5}
-        />
-      </svg>
+      <div className="relative h-10 w-10">
+        {/* 회색 배경 */}
+        <svg
+          className="absolute inset-0 h-10 w-10 text-zinc-200"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+        {/* 색상 반만 채워진 부분 */}
+        <div className="absolute inset-0 overflow-hidden" style={{ width: "50%" }}>
+          <svg
+            className="h-10 w-10 text-yellow-400"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+          </svg>
+        </div>
+      </div>
     );
   }
 
+  // 빈 상태: 회색으로 채워진 아이콘
   return (
     <svg
-      className="h-10 w-10 text-zinc-300"
-      fill="none"
-      stroke="currentColor"
+      className="h-10 w-10 text-zinc-200"
+      fill="currentColor"
       viewBox="0 0 20 20"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.5}
-        d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-      />
+      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
     </svg>
   );
 }
@@ -209,49 +204,50 @@ function HeartIcon({ state, index }: { state: "filled" | "half" | "empty"; index
   }
 
   if (state === "half") {
+    // 0.5점: 회색 배경 + 색상 반만 채워진 상태
     return (
-      <svg
-        className="h-10 w-10 text-red-400"
-        fill="currentColor"
-        viewBox="0 0 20 20"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="50%" stopColor="currentColor" />
-            <stop offset="50%" stopColor="transparent" stopOpacity="1" />
-          </linearGradient>
-        </defs>
-        <path
-          fillRule="evenodd"
-          d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-          clipRule="evenodd"
-          fill={`url(#${gradientId})`}
-        />
-        <path
-          fillRule="evenodd"
-          d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-          clipRule="evenodd"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.5}
-        />
-      </svg>
+      <div className="relative h-10 w-10">
+        {/* 회색 배경 */}
+        <svg
+          className="absolute inset-0 h-10 w-10 text-zinc-200"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            fillRule="evenodd"
+            d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+            clipRule="evenodd"
+          />
+        </svg>
+        {/* 색상 반만 채워진 부분 */}
+        <div className="absolute inset-0 overflow-hidden" style={{ width: "50%" }}>
+          <svg
+            className="h-10 w-10 text-red-400"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              fillRule="evenodd"
+              d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </div>
+      </div>
     );
   }
 
+  // 빈 상태: 회색으로 채워진 아이콘
   return (
     <svg
-      className="h-10 w-10 text-zinc-300"
-      fill="none"
-      stroke="currentColor"
+      className="h-10 w-10 text-zinc-200"
+      fill="currentColor"
       viewBox="0 0 20 20"
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.5}
         fillRule="evenodd"
         d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
         clipRule="evenodd"

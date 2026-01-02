@@ -9,9 +9,12 @@ import { normalizeRating } from "@/lib/utils/rating";
 import { Performance, Evaluation } from "@/types";
 import EvaluationCompleteModal from "@/components/evaluation/EvaluationCompleteModal";
 import NoEvaluationsModal from "@/components/evaluation/NoEvaluationsModal";
+import StatsBanner from "@/components/layout/StatsBanner";
+import Button from "@/components/ui/Button";
 import Image from "next/image";
 import { getPerformanceCreators, formatCreators } from "@/lib/utils/performance-creators";
 import CreatorInfo from "@/components/performance/CreatorInfo";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
  * 공연 평가 입력 화면
@@ -720,12 +723,10 @@ export default function EvaluatePage() {
       </div>
 
       {/* 상단 통계 */}
-      <div className="px-4 pb-4">
-        <p className="text-sm text-purple-600">상위 3%</p>
-        <p className="mt-1 text-base font-medium text-black">
-          지금까지 공연 <strong>{totalEvaluated}</strong> 개를 보셨어요
-        </p>
-      </div>
+      <StatsBanner
+        rank="상위 3%"
+        count={totalEvaluated}
+      />
 
       {/* 스크롤 가능한 공연 카드 영역 */}
       <div className="relative mb-20">
@@ -741,11 +742,11 @@ export default function EvaluatePage() {
             >
               <div className="px-4">
                 {/* 포스터 */}
-                <div className="relative mb-6">
-                  <div className="relative mx-auto max-w-xs">
+                <div className="relative mb-6 flex justify-center">
+                  <div className="relative w-full max-w-sm">
                     {/* 이전 공연 미리보기 (왼쪽) */}
                     {index > 0 && (
-                      <div className="absolute -left-12 top-0 h-full w-12 overflow-hidden opacity-30">
+                      <div className="absolute -left-20 top-0 h-full w-12 overflow-hidden opacity-30">
                         <PosterImage
                           posterUrl={posterUrls[performances[index - 1].id]}
                           title={performances[index - 1].title}
@@ -768,19 +769,7 @@ export default function EvaluatePage() {
                           className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg transition-colors hover:bg-white"
                           aria-label="이전 공연"
                         >
-                          <svg
-                            className="h-5 w-5 text-zinc-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 19l-7-7 7-7"
-                            />
-                          </svg>
+                          <ChevronLeft className="h-5 w-5 text-zinc-600" />
                         </button>
                       )}
                       {index < performances.length - 1 && (
@@ -789,26 +778,14 @@ export default function EvaluatePage() {
                           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow-lg transition-colors hover:bg-white"
                           aria-label="다음 공연"
                         >
-                          <svg
-                            className="h-5 w-5 text-zinc-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 5l7 7-7 7"
-                            />
-                          </svg>
+                          <ChevronRight className="h-5 w-5 text-zinc-600" />
                         </button>
                       )}
                     </div>
 
                     {/* 다음 공연 미리보기 (오른쪽) */}
                     {index < performances.length - 1 && (
-                      <div className="absolute -right-12 top-0 h-full w-12 overflow-hidden opacity-30">
+                      <div className="absolute -right-20 top-0 h-full w-12 overflow-hidden opacity-30">
                         <PosterImage
                           posterUrl={posterUrls[performances[index + 1].id]}
                           title={performances[index + 1].title}
@@ -843,12 +820,14 @@ export default function EvaluatePage() {
 
       {/* 하단 버튼 (고정) */}
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white p-4">
-        <button
+        <Button
+          variant="secondary"
+          size="lg"
+          fullWidth
           onClick={handleComplete}
-          className="w-full rounded-lg bg-zinc-200 px-6 py-4 text-base font-medium text-black transition-colors hover:bg-zinc-300"
         >
           평가 끝내고 결과 확인하기
-        </button>
+        </Button>
       </div>
 
       {showCompleteModal && (
@@ -882,11 +861,11 @@ function PosterImage({
   isPreview?: boolean;
 }) {
   return (
-    <div
-      className={`overflow-hidden rounded-lg bg-zinc-200 ${
-        isPreview ? "aspect-[2/3] h-full" : "aspect-[2/3] w-full"
-      }`}
-    >
+        <div
+          className={`overflow-hidden rounded-lg bg-zinc-200 ${
+            isPreview ? "aspect-[2/3] h-full" : "aspect-[2/3] w-full max-w-sm"
+          }`}
+        >
       {posterUrl ? (
         <Image
           src={posterUrl}
@@ -899,7 +878,7 @@ function PosterImage({
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-100 to-zinc-200">
           <svg
-            className={`text-zinc-400 ${isPreview ? "h-8 w-8" : "h-16 w-16"}`}
+            className={`text-zinc-400 ${isPreview ? "h-8 w-8" : "h-24 w-24"}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -935,11 +914,11 @@ function EvaluationCard({
   onNotSeen: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto max-w-md text-center">
       <h1 className="mb-2 text-2xl font-bold text-black">{performance.title}</h1>
       
       {/* 극본/작곡 정보 */}
-      <div className="mb-6">
+      <div className="mb-6 flex justify-center">
         <CreatorInfo
           writer={creators.writer}
           composer={creators.composer}
@@ -947,19 +926,23 @@ function EvaluationCard({
       </div>
 
       <div className="space-y-6">
-        <RatingInput
-          label="잘 만들었나요?"
-          value={starRating}
-          onChange={onStarChange}
-          icon="star"
-        />
+        <div className="flex justify-center">
+          <RatingInput
+            label="잘 만들었나요?"
+            value={starRating}
+            onChange={onStarChange}
+            icon="star"
+          />
+        </div>
 
-        <RatingInput
-          label="좋아하나요?"
-          value={likeRating}
-          onChange={onLikeChange}
-          icon="heart"
-        />
+        <div className="flex justify-center">
+          <RatingInput
+            label="좋아하나요?"
+            value={likeRating}
+            onChange={onLikeChange}
+            icon="heart"
+          />
+        </div>
       </div>
 
       {/* 안봤어요 버튼 */}
