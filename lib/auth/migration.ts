@@ -46,7 +46,7 @@ export async function migrateGuestEvaluationsToUser(
           .from("evaluation")
           .select("id")
           .eq("user_id", userId)
-          .eq("performance_id", evaluation.performance_id)
+          .eq("performance_id", evaluation.performance_id ?? "")
           .limit(1)
           .maybeSingle();
 

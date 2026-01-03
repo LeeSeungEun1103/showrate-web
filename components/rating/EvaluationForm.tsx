@@ -40,8 +40,8 @@ export default function EvaluationForm({
   // 기존 평가가 있으면 초기값 설정
   useEffect(() => {
     if (existingEvaluation) {
-      setStarRating(existingEvaluation.star_rating);
-      setLikeRating(existingEvaluation.like_rating);
+      setStarRating(existingEvaluation.star_rating ?? 0);
+      setLikeRating(existingEvaluation.like_rating ?? 0);
     }
   }, [existingEvaluation]);
 

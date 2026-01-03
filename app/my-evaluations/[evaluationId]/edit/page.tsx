@@ -83,8 +83,8 @@ export default function EditEvaluationPage() {
 
         // Supabase에서 반환된 데이터를 직접 사용 (타입 안전)
         setEvaluation(evaluationData);
-        setStarRating(evaluationData.star_rating);
-        setLikeRating(evaluationData.like_rating);
+        setStarRating(evaluationData.star_rating ?? 0);
+        setLikeRating(evaluationData.like_rating ?? 0);
 
         // Performance 정보 조회 (performance_id 직접 사용)
         const performanceId = evaluationData.performance_id;

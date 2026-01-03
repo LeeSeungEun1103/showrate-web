@@ -97,8 +97,8 @@ export default function MyEvaluationsPage() {
           // 이미 같은 performance_id의 평가가 있고, 현재 평가가 더 최근이면 업데이트
           const existing = performanceMap.get(performanceId);
           if (existing) {
-            const existingDate = new Date(existing.updated_at || existing.created_at);
-            const currentDate = new Date(evalTyped.updated_at || evalTyped.created_at);
+            const existingDate = new Date(existing.updated_at || existing.created_at || Date.now());
+            const currentDate = new Date(evalTyped.updated_at || evalTyped.created_at || Date.now());
             if (currentDate > existingDate) {
               // 더 최근 평가로 교체
               const { data: performance } = await supabase
@@ -172,19 +172,19 @@ export default function MyEvaluationsPage() {
     filtered.sort((a, b) => {
       switch (sortType) {
         case "star_high":
-          return b.star_rating - a.star_rating;
+          return (b.star_rating ?? 0) - (a.star_rating ?? 0);
         
         case "heart_high":
-          return b.like_rating - a.like_rating;
+          return (b.like_rating ?? 0) - (a.like_rating ?? 0);
         
         case "star_low_heart_high":
-          const diffA = a.like_rating - a.star_rating;
-          const diffB = b.like_rating - b.star_rating;
+          const diffA = (a.like_rating ?? 0) - (a.star_rating ?? 0);
+          const diffB = (b.like_rating ?? 0) - (b.star_rating ?? 0);
           return diffB - diffA;
         
         case "star_high_heart_low":
-          const diffHighA = a.star_rating - a.like_rating;
-          const diffHighB = b.star_rating - b.like_rating;
+          const diffHighA = (a.star_rating ?? 0) - (a.like_rating ?? 0);
+          const diffHighB = (b.star_rating ?? 0) - (b.like_rating ?? 0);
           return diffHighB - diffHighA;
         
         default:
@@ -338,10 +338,10 @@ export default function MyEvaluationsPage() {
                     )}
                     <div className="mt-2 flex flex-col gap-2">
                       <div className="flex items-center justify-between">
-                        <RatingDisplay type="star" value={evaluation.star_rating} size="md" showNumber={true} />
+                        <RatingDisplay type="star" value={evaluation.star_rating ?? 0} size="md" showNumber={true} />
                         <Pencil className="h-4 w-4 text-zinc-400" />
                       </div>
-                      <RatingDisplay type="heart" value={evaluation.like_rating} size="md" showNumber={true} />
+                      <RatingDisplay type="heart" value={evaluation.like_rating ?? 0} size="md" showNumber={true} />
                     </div>
                   </div>
                 </div>

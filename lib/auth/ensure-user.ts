@@ -1,5 +1,5 @@
 /**
- * public.user 테이블에 사용자가 존재하는지 확인하고, 없으면 생성하는 유틸리티
+ * public.user_profile 테이블에 사용자가 존재하는지 확인하고, 없으면 생성하는 유틸리티
  */
 
 import { createClient } from "@/lib/supabase/client";
@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
 /**
- * public.user 테이블에 사용자가 존재하는지 확인하고, 없으면 생성
+ * public.user_profile 테이블에 사용자가 존재하는지 확인하고, 없으면 생성
  * @param supabase Supabase 클라이언트
  * @param userId 사용자 ID (auth.users.id)
  * @param email 사용자 이메일 (선택적)
@@ -20,7 +20,7 @@ export async function ensureUserExists(
   try {
     // 먼저 사용자가 존재하는지 확인
     const { data: existingUser, error: checkError } = await supabase
-      .from("user")
+      .from("user_profile")
       .select("id")
       .eq("id", userId)
       .maybeSingle();
@@ -40,12 +40,13 @@ export async function ensureUserExists(
     let lastError = null;
 
     while (retries > 0) {
+      const insertData: Database["public"]["Tables"]["user_profile"]["Insert"] = {
+        id: userId, // auth.users.id
+        email: email || "unknown@example.com", // email은 필수
+      };
       const { error: insertError } = await supabase
-        .from("user")
-        .insert({
-          id: userId, // auth.users.id
-          email: email || null,
-        });
+        .from("user_profile")
+        .insert(insertData);
 
       if (!insertError) {
         return true;

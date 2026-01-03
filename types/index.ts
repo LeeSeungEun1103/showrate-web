@@ -5,7 +5,7 @@
 import { Database } from "./database";
 
 // 테이블 타입 별칭 (사용 편의성을 위해)
-export type User = Database["public"]["Tables"]["user"]["Row"];
+export type UserProfile = Database["public"]["Tables"]["user_profile"]["Row"];
 export type Guest = Database["public"]["Tables"]["guest"]["Row"];
 export type Performance = Database["public"]["Tables"]["performance"]["Row"];
 export type Venue = Database["public"]["Tables"]["venue"]["Row"];
@@ -15,7 +15,7 @@ export type PerformancePerson = Database["public"]["Tables"]["performance_person
 export type Evaluation = Database["public"]["Tables"]["evaluation"]["Row"];
 
 // Insert 타입
-export type UserInsert = Database["public"]["Tables"]["user"]["Insert"];
+export type UserProfileInsert = Database["public"]["Tables"]["user_profile"]["Insert"];
 export type GuestInsert = Database["public"]["Tables"]["guest"]["Insert"];
 export type PerformanceInsert = Database["public"]["Tables"]["performance"]["Insert"];
 export type VenueInsert = Database["public"]["Tables"]["venue"]["Insert"];
@@ -25,7 +25,7 @@ export type PerformancePersonInsert = Database["public"]["Tables"]["performance_
 export type EvaluationInsert = Database["public"]["Tables"]["evaluation"]["Insert"];
 
 // Update 타입
-export type UserUpdate = Database["public"]["Tables"]["user"]["Update"];
+export type UserProfileUpdate = Database["public"]["Tables"]["user_profile"]["Update"];
 export type GuestUpdate = Database["public"]["Tables"]["guest"]["Update"];
 export type PerformanceUpdate = Database["public"]["Tables"]["performance"]["Update"];
 export type VenueUpdate = Database["public"]["Tables"]["venue"]["Update"];
@@ -48,7 +48,7 @@ export type PerformanceSeasonWithDetails = PerformanceSeason & {
 
 export type EvaluationWithDetails = Evaluation & {
   season: PerformanceSeasonWithDetails;
-  user?: User | null;
+  user?: UserProfile | null;
   guest?: Guest | null;
 };
 

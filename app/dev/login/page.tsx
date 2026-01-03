@@ -24,9 +24,9 @@ export default function DevLoginPage() {
 
       console.log("[Dev Login] Starting login with user ID:", devUserId);
 
-      // User 테이블에 해당 id가 없으면 생성
+      // user_profile 테이블에 해당 id가 없으면 생성
       const { data: existingUser, error: checkError } = await supabase
-        .from("user")
+        .from("user_profile")
         .select("id")
         .eq("id", devUserId)
         .maybeSingle();
@@ -39,12 +39,11 @@ export default function DevLoginPage() {
       if (!existingUser) {
         console.log("[Dev Login] User not found, creating new user...");
         const { error: createError } = await supabase
-          .from("user")
+          .from("user_profile")
           .insert({
             id: devUserId,
             email: "dev@test.com",
-            password_hash: "dev_password_hash", // 임시값
-          } as any);
+          });
 
         if (createError) {
           console.error("[Dev Login] User creation error:", createError);
@@ -96,7 +95,7 @@ export default function DevLoginPage() {
 
         <div className="text-xs text-zinc-500">
           <p>• 고정된 테스트 UUID를 사용합니다</p>
-          <p>• Supabase user 테이블에 자동으로 생성됩니다</p>
+          <p>• Supabase user_profile 테이블에 자동으로 생성됩니다</p>
           <p>• 모든 평가는 이 계정으로 저장됩니다</p>
         </div>
       </div>
