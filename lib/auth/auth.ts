@@ -5,6 +5,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { clearGuestId } from "@/lib/utils/guest";
 import type { User } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
 export interface AuthResult {
   user: User | null;
@@ -29,18 +30,19 @@ export async function signUpWithEmail(
       return { user: null, error: new Error(error.message) };
     }
 
-    // public.user 테이블에 프로필 생성 (auth.users.id를 기준으로)
+    // public.user_profile 테이블에 프로필 생성 (auth.users.id를 기준으로)
     if (data.user) {
       let retries = 3;
       let profileError = null;
       
       while (retries > 0) {
+        const insertData: Database["public"]["Tables"]["user_profile"]["Insert"] = {
+          id: data.user.id, // auth.users.id
+          email: data.user.email || email || "unknown@example.com", // email은 필수
+        };
         const { error } = await supabase
-          .from("user")
-          .upsert({
-            id: data.user.id, // auth.users.id
-            email: data.user.email || email || null,
-          }, {
+          .from("user_profile")
+          .upsert(insertData, {
             onConflict: "id"
           });
 
@@ -92,18 +94,19 @@ export async function signInWithEmail(
       return { user: null, error: new Error(error.message) };
     }
 
-    // public.user 테이블에 프로필이 없으면 생성 (auth.users.id를 기준으로)
+    // public.user_profile 테이블에 프로필이 없으면 생성 (auth.users.id를 기준으로)
     if (data.user) {
       let retries = 3;
       let profileError = null;
       
       while (retries > 0) {
+        const insertData: Database["public"]["Tables"]["user_profile"]["Insert"] = {
+          id: data.user.id, // auth.users.id
+          email: data.user.email || email || "unknown@example.com", // email은 필수
+        };
         const { error } = await supabase
-          .from("user")
-          .upsert({
-            id: data.user.id, // auth.users.id
-            email: data.user.email || email || null,
-          }, {
+          .from("user_profile")
+          .upsert(insertData, {
             onConflict: "id"
           });
 
