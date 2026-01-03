@@ -16,21 +16,18 @@ export interface Database {
     Tables: {
       user: {
         Row: {
-          id: string; // uuid
-          email: string;
-          password_hash: string;
+          id: string; // uuid (auth.users.id와 동일)
+          email: string | null;
           created_at: string; // timestamp
         };
         Insert: {
-          id?: string;
-          email: string;
-          password_hash: string;
+          id: string; // auth.users.id (필수)
+          email?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
-          email?: string;
-          password_hash?: string;
+          email?: string | null;
           created_at?: string;
         };
       };

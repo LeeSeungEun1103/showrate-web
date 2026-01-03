@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getDevUserId } from "@/lib/utils/dev-user";
+import { getCurrentUser } from "@/lib/auth/auth";
 import { normalizeRating } from "@/lib/utils/rating";
 import RatingInput from "@/components/rating/RatingInput";
 import { Database } from "@/types/database";
@@ -42,22 +42,26 @@ export default function EditEvaluationPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
 
-  // 사용자 ID 로드
+  // 사용자 인증 확인
   useEffect(() => {
-    const id = getDevUserId();
-    setUserId(id ? id.substring(0, 8) : null);
-    if (!id) {
-      router.push("/dev/login");
-      return;
+    async function checkAuth() {
+      const user = await getCurrentUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      setUserId(user.id.substring(0, 8));
     }
+    checkAuth();
   }, [router]);
 
   useEffect(() => {
     async function loadEvaluation() {
-      const currentUserId = getDevUserId();
-      if (!currentUserId) {
+      const user = await getCurrentUser();
+      if (!user) {
         return;
       }
+      const currentUserId = user.id;
 
       try {
         const supabase = createClient();

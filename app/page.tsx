@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Performance } from "@/types";
 import Link from "next/link";
@@ -10,8 +11,11 @@ import SearchInput from "@/components/ui/SearchInput";
 import FilterButton from "@/components/ui/FilterButton";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import { getDevUserId } from "@/lib/utils/dev-user";
+import { getCurrentUser } from "@/lib/auth/auth";
+import { signOut } from "@/lib/auth/auth";
 import { getPerformanceCreators, formatCreators } from "@/lib/utils/performance-creators";
+import LoginModal from "@/components/auth/LoginModal";
+import Toast from "@/components/ui/Toast";
 import { Star, Heart, Plus } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -27,17 +31,25 @@ interface PerformanceWithStats extends Performance {
 type SortType = "star_high" | "heart_high" | "star_low_heart_high" | "star_high_heart_low";
 
 export default function HomePage() {
+  const router = useRouter();
   const [performances, setPerformances] = useState<PerformanceWithStats[]>([]);
   const [filteredPerformances, setFilteredPerformances] = useState<PerformanceWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortType, setSortType] = useState<SortType>("star_high");
   const [userId, setUserId] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
-  // 사용자 ID 로드
+  // 사용자 인증 상태 확인 (선택적)
   useEffect(() => {
-    const id = getDevUserId();
-    setUserId(id ? id.substring(0, 8) : null);
+    async function checkAuth() {
+      const user = await getCurrentUser();
+      if (user) {
+        setUserId(user.id.substring(0, 8));
+      }
+    }
+    checkAuth();
   }, []);
 
   // 공연 목록 로드
@@ -195,7 +207,17 @@ export default function HomePage() {
         <Header
           userId={userId || undefined}
           title="ShowRate"
-          showLogout={false}
+          showLogout={!!userId}
+          showLogin={!userId}
+          onLogout={async () => {
+            await signOut();
+            setUserId(null);
+            setShowToast(true);
+            router.refresh();
+          }}
+          onLogin={() => {
+            setShowLoginModal(true);
+          }}
         />
 
         {/* 검색 바 */}
@@ -264,6 +286,35 @@ export default function HomePage() {
         <Plus className="h-5 w-5" />
         <span>공연 평가하기</span>
       </Link>
+
+      {/* 로그인 모달 */}
+      {showLoginModal && (
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => {
+            setShowLoginModal(false);
+          }}
+          onSuccess={() => {
+            setShowLoginModal(false);
+            // 인증 상태 다시 확인
+            async function refreshAuth() {
+              const user = await getCurrentUser();
+              if (user) {
+                setUserId(user.id.substring(0, 8));
+              }
+            }
+            refreshAuth();
+            router.refresh();
+          }}
+        />
+      )}
+
+      {/* 토스트 알림 */}
+      <Toast
+        message="로그아웃 되었습니다"
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   );
 }

@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { getDevUserId } from "@/lib/utils/dev-user";
+import { getCurrentUser, signOut } from "@/lib/auth/auth";
+import Toast from "@/components/ui/Toast";
 import { Database } from "@/types/database";
 import { Performance, Evaluation } from "@/types";
 import GlobalNav from "@/components/layout/GlobalNav";
@@ -45,32 +46,39 @@ export default function MyEvaluationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortType, setSortType] = useState<SortType>("star_high");
   const [userId, setUserId] = useState<string | null>(null);
+  const [showLogoutToast, setShowLogoutToast] = useState(false);
 
-  // 사용자 ID 로드
+  // 사용자 인증 확인
   useEffect(() => {
-    const id = getDevUserId();
-    setUserId(id ? id.substring(0, 8) : null);
-    if (!id) {
-      router.push("/dev/login");
-      return;
+    async function checkAuth() {
+      const user = await getCurrentUser();
+      if (!user) {
+        // 로그인하지 않은 경우 로그인 화면으로 리다이렉트
+        router.push("/login");
+        return;
+      }
+      setUserId(user.id.substring(0, 8));
     }
+    checkAuth();
   }, [router]);
 
   useEffect(() => {
     async function loadEvaluations() {
-      const currentUserId = getDevUserId();
-      if (!currentUserId) {
+      const user = await getCurrentUser();
+      if (!user) {
         return;
       }
+      const currentUserId = user.id;
 
       try {
         const supabase = createClient();
 
-        // 사용자의 모든 평가 조회
+        // 사용자의 모든 평가 조회 (user_id만, guest_id는 제외)
         const { data: evaluationsData, error } = await supabase
           .from("evaluation")
           .select("*")
           .eq("user_id", currentUserId)
+          .is("guest_id", null)
           .order("updated_at", { ascending: false });
 
         if (error) throw error;
@@ -202,7 +210,13 @@ export default function MyEvaluationsPage() {
         <Header
           userId={userId || undefined}
           title="ShowRate"
-          showLogout={false}
+          showLogout={!!userId}
+          onLogout={async () => {
+            await signOut();
+            setUserId(null);
+            setShowLogoutToast(true);
+            router.push("/");
+          }}
         />
 
         {/* 통계 배너 */}
@@ -348,6 +362,13 @@ export default function MyEvaluationsPage() {
         <Plus className="h-5 w-5" />
         <span>공연 평가하기</span>
       </Link>
+
+      {/* 로그아웃 토스트 알림 */}
+      <Toast
+        message="로그아웃 되었습니다"
+        isVisible={showLogoutToast}
+        onClose={() => setShowLogoutToast(false)}
+      />
     </div>
   );
 }

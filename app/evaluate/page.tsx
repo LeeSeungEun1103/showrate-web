@@ -3,12 +3,16 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getDevUserId } from "@/lib/utils/dev-user";
+import { getCurrentUser } from "@/lib/auth/auth";
+import { getGuestId } from "@/lib/utils/guest";
+import { ensureUserExists } from "@/lib/auth/ensure-user";
+import { ensureGuestExists } from "@/lib/utils/ensure-guest";
 import RatingInput from "@/components/rating/RatingInput";
 import { normalizeRating } from "@/lib/utils/rating";
 import { Performance, Evaluation } from "@/types";
-import EvaluationCompleteModal from "@/components/evaluation/EvaluationCompleteModal";
 import NoEvaluationsModal from "@/components/evaluation/NoEvaluationsModal";
+import EvaluationCompleteModal from "@/components/evaluation/EvaluationCompleteModal";
+import AuthModal from "@/components/auth/AuthModal";
 import StatsBanner from "@/components/layout/StatsBanner";
 import Button from "@/components/ui/Button";
 import Image from "next/image";
@@ -39,23 +43,36 @@ export default function EvaluatePage() {
   const [savedEvaluations, setSavedEvaluations] = useState<
     Record<string, Evaluation>
   >({});
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [totalEvaluated, setTotalEvaluated] = useState(0);
+  // 클라이언트 단에서만 관리하는 실시간 평가 카운트 (DB와 별도)
+  const [clientTotalEvaluated, setClientTotalEvaluated] = useState(0);
+  // 완료된 평가를 추적하는 Set (처음 완료될 때만 카운트 증가)
+  const [completedEvaluations, setCompletedEvaluations] = useState<Set<string>>(new Set());
   const [posterUrls, setPosterUrls] = useState<Record<string, string | null>>({});
   const [userId, setUserId] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [hasEvaluatedInSession, setHasEvaluatedInSession] = useState(false);
   const [creators, setCreators] = useState<Record<string, { writer: string | null; composer: string | null }>>({});
   const [showNoEvaluationsModal, setShowNoEvaluationsModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // 사용자 ID 로드
+  // 사용자 인증 상태 확인
   useEffect(() => {
-    const id = getDevUserId();
-    setUserId(id);
-    if (!id) {
-      router.push("/dev/login");
+    async function checkAuth() {
+      const user = await getCurrentUser();
+      if (user) {
+        setIsAuthenticated(true);
+        setUserId(user.id);
+      } else {
+        // Guest ID 사용
+        const guestId = getGuestId();
+        setUserId(guestId);
+      }
     }
-  }, [router]);
+    checkAuth();
+  }, []);
 
   // 모든 데이터 fetch 및 상태 결정을 하나의 useEffect에서 처리
   useEffect(() => {
@@ -63,7 +80,9 @@ export default function EvaluatePage() {
       setStatus("loading");
       
       try {
-        const currentUserId = getDevUserId();
+        // 인증된 사용자 또는 Guest ID 확인
+        const user = await getCurrentUser();
+        const currentUserId = user?.id || getGuestId();
         if (!currentUserId) {
           setStatus("empty");
           return;
@@ -109,10 +128,28 @@ export default function EvaluatePage() {
         setCreators(creatorsData);
 
         // 3. 기존 평가 로드 (performance 기준)
-        const { data: allUserEvaluations } = await supabase
-          .from("evaluation")
-          .select("*")
-          .eq("user_id", currentUserId);
+        // 인증된 사용자 또는 Guest에 따라 다르게 조회
+        let allUserEvaluations = null;
+        if (user) {
+          // 인증된 사용자: user_id 기준
+          const { data } = await supabase
+            .from("evaluation")
+            .select("*")
+            .eq("user_id", user.id)
+            .is("guest_id", null);
+          allUserEvaluations = data;
+        } else {
+          // Guest: guest_id 기준
+          const guestId = getGuestId();
+          if (guestId) {
+            const { data } = await supabase
+              .from("evaluation")
+              .select("*")
+              .eq("guest_id", guestId)
+              .is("user_id", null);
+            allUserEvaluations = data;
+          }
+        }
 
         const evaluationsMap: Record<string, Evaluation> = {};
         const evaluatedPerformanceIdSet = new Set<string>();
@@ -129,6 +166,9 @@ export default function EvaluatePage() {
 
         setSavedEvaluations(evaluationsMap);
         setTotalEvaluated(evaluatedPerformanceIdSet.size);
+        setClientTotalEvaluated(evaluatedPerformanceIdSet.size);
+        // 이미 완료된 평가들을 Set에 추가
+        setCompletedEvaluations(new Set(Array.from(evaluatedPerformanceIdSet)));
 
         // 4. 평가하지 않은 공연 필터링
         const unevaluatedPerformances = allPerfsData.filter((p) =>
@@ -175,6 +215,13 @@ export default function EvaluatePage() {
     }
   }, [currentIndex, performances.length]);
 
+  // 모든 공연 평가 완료 시 (세션 중 평가를 완료한 경우에만 처리)
+  useEffect(() => {
+    if (status === "ready" && performances.length === 0 && allPerformances.length > 0 && hasEvaluatedInSession && !showAuthModal) {
+      checkAndShowCompleteModal();
+    }
+  }, [status, performances.length, allPerformances.length, hasEvaluatedInSession, showAuthModal]);
+
   const handleRatingChange = async (
     performanceId: string,
     type: "star" | "like",
@@ -194,15 +241,27 @@ export default function EvaluatePage() {
       [performanceId]: newState,
     }));
 
-    // 둘 다 0보다 크면 저장 후 자동으로 다음 공연으로
+    // 둘 다 0보다 크면 "완료" 처리 (단 1번만)
     if (newState.starRating > 0 && newState.likeRating > 0) {
-      console.log("[Evaluation] 🎯 Triggering save evaluation", {
-        performanceId,
-        ratings: { star: newState.starRating, like: newState.likeRating },
-      });
-      await handleSaveEvaluation(performanceId);
+      // 이미 완료된 평가인지 확인
+      const isAlreadyCompleted = completedEvaluations.has(performanceId);
       
-      // 약간의 딜레이 후 다음 공연으로
+      if (!isAlreadyCompleted) {
+        // 처음 완료 처리: 완료 Set에 추가하고 카운트 +1
+        setCompletedEvaluations((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(performanceId);
+          return newSet;
+        });
+        setClientTotalEvaluated((prev) => prev + 1);
+      }
+
+      // DB 저장은 비동기로 처리 (UI 상태와 분리)
+      handleSaveEvaluation(performanceId).catch((error) => {
+        console.error("[Evaluation] ❌ Failed to save evaluation:", error);
+      });
+
+      // 완료된 순간 다음 공연으로 이동 (DB 저장 완료를 기다리지 않음)
       setTimeout(() => {
         const currentPerformanceIndex = (performances as Performance[]).findIndex(
           (p) => p.id === performanceId
@@ -228,6 +287,16 @@ export default function EvaluatePage() {
       },
     }));
 
+    // 완료 Set에서 제거 (리셋된 경우)
+    setCompletedEvaluations((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(performanceId)) {
+        newSet.delete(performanceId);
+        setClientTotalEvaluated((count) => Math.max(0, count - 1));
+      }
+      return newSet;
+    });
+
     // 다음 공연으로 이동 (완료로 평가하지 않음)
     const currentPerformanceIndex = (performances as Performance[]).findIndex(
       (p) => p.id === performanceId
@@ -243,26 +312,55 @@ export default function EvaluatePage() {
 
   const checkAndShowCompleteModal = async () => {
     // DB에서 실제 총 평가 수 가져오기
-    const currentUserId = getDevUserId();
-    if (!currentUserId) return;
-
     try {
       const supabase = createClient();
-      const { data: allEvaluations } = await supabase
-        .from("evaluation")
-        .select("id")
-        .eq("user_id", currentUserId);
+      const user = await getCurrentUser();
+      
+      let totalCount = 0;
+      if (user) {
+        // 인증된 사용자: user_id 기준
+        const { data: allEvaluations } = await supabase
+          .from("evaluation")
+          .select("id")
+          .eq("user_id", user.id)
+          .is("guest_id", null);
+        totalCount = allEvaluations?.length || 0;
+      } else {
+        // Guest: guest_id 기준
+        const guestId = getGuestId();
+        if (guestId) {
+          const { data: allEvaluations } = await supabase
+            .from("evaluation")
+            .select("id")
+            .eq("guest_id", guestId)
+            .is("user_id", null);
+          totalCount = allEvaluations?.length || 0;
+        }
+      }
 
-      const totalCount = allEvaluations?.length || 0;
       setTotalEvaluated(totalCount);
-      setShowCompleteModal(true);
+      
+      // 로그인된 사용자도 평가 완료 모달 표시
+      if (user) {
+        // 로그인된 사용자: 평가 완료 모달 표시 (예전 팝업)
+        setShowCompleteModal(true);
+      } else {
+        // Guest인 경우 AuthModal 표시
+        setShowAuthModal(true);
+      }
     } catch (error) {
       console.error("Failed to load total evaluations:", error);
-      setShowCompleteModal(true);
+      // 에러 발생 시에도 Guest인 경우 AuthModal 표시
+      const user = await getCurrentUser();
+      if (!user) {
+        setShowAuthModal(true);
+      } else {
+        router.push("/my-evaluations");
+      }
     }
   };
 
-  const handleSaveEvaluation = async (performanceId: string) => {
+  const handleSaveEvaluation = async (performanceId: string): Promise<boolean> => {
     console.log("[Evaluation] 🚀 handleSaveEvaluation START", {
       performanceId,
       evaluation: evaluations[performanceId],
@@ -276,7 +374,7 @@ export default function EvaluatePage() {
         starRating: evaluation?.starRating,
         likeRating: evaluation?.likeRating,
       });
-      return;
+      return false;
     }
 
     try {
@@ -287,12 +385,31 @@ export default function EvaluatePage() {
         hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       });
 
-      const currentUserId = getDevUserId();
-      console.log("[Evaluation] 👤 User ID:", currentUserId);
+      // 인증된 사용자 또는 Guest ID 확인
+      const user = await getCurrentUser();
+      const currentUserId = user?.id || getGuestId();
+      const isGuest = !user;
+      
+      console.log("[Evaluation] 👤 User ID:", currentUserId, "isGuest:", isGuest);
       if (!currentUserId) {
-        console.log("[Evaluation] ⛔ No user ID, redirecting to login");
-        router.push("/dev/login");
-        return;
+        console.log("[Evaluation] ⛔ No user ID or guest ID");
+        return false;
+      }
+
+      // 인증된 사용자인 경우, public.user 테이블에 사용자가 존재하는지 확인하고 없으면 생성
+      if (!isGuest && user) {
+        const userExists = await ensureUserExists(supabase, user.id, user.email || undefined);
+        if (!userExists) {
+          console.error("[Evaluation] ⛔ Failed to ensure user exists in public.user table");
+          throw new Error("사용자 정보를 저장할 수 없습니다. 다시 시도해주세요.");
+        }
+      } else if (isGuest) {
+        // Guest인 경우, public.guest 테이블에 Guest가 존재하는지 확인하고 없으면 생성
+        const guestExists = await ensureGuestExists(supabase, currentUserId);
+        if (!guestExists) {
+          console.error("[Evaluation] ⛔ Failed to ensure guest exists in public.guest table");
+          throw new Error("게스트 정보를 저장할 수 없습니다. 다시 시도해주세요.");
+        }
       }
 
       const normalizedStar = normalizeRating(evaluation.starRating);
@@ -302,19 +419,39 @@ export default function EvaluatePage() {
         normalized: { star: normalizedStar, like: normalizedLike },
       });
 
-      // user_id + performance_id로 기존 평가 찾기 (season_id 무시)
+      // user_id 또는 guest_id + performance_id로 기존 평가 찾기 (season_id 무시)
       console.log("[Evaluation] 🔍 Checking for existing evaluation...", {
         userId: currentUserId,
+        isGuest,
         performanceId,
         performanceIdType: typeof performanceId,
         performanceIdLength: performanceId?.length,
       });
-      const { data: existingEval, error: checkError } = await supabase
-        .from("evaluation")
-        .select("*")
-        .eq("user_id", currentUserId)
-        .eq("performance_id", performanceId)
-        .maybeSingle();
+      
+      let existingEval;
+      let checkError;
+      
+      if (isGuest) {
+        // Guest: guest_id 기준
+        const result = await supabase
+          .from("evaluation")
+          .select("*")
+          .eq("guest_id", currentUserId)
+          .eq("performance_id", performanceId)
+          .maybeSingle();
+        existingEval = result.data;
+        checkError = result.error;
+      } else {
+        // 인증된 사용자: user_id 기준
+        const result = await supabase
+          .from("evaluation")
+          .select("*")
+          .eq("user_id", currentUserId)
+          .eq("performance_id", performanceId)
+          .maybeSingle();
+        existingEval = result.data;
+        checkError = result.error;
+      }
       
       console.log("[Evaluation] 🔍 Existing evaluation check result:", {
         existingEval,
@@ -374,17 +511,29 @@ export default function EvaluatePage() {
           console.log("[Evaluation] Update failed, attempting INSERT instead...");
           
           // INSERT로 전환
+          const insertPayload = isGuest
+            ? {
+                user_id: null,
+                guest_id: currentUserId,
+                season_id: null,
+                performance_id: performanceId,
+                star_rating: normalizedStar,
+                like_rating: normalizedLike,
+                comment: null,
+              }
+            : {
+                user_id: currentUserId,
+                guest_id: null,
+                season_id: null,
+                performance_id: performanceId,
+                star_rating: normalizedStar,
+                like_rating: normalizedLike,
+                comment: null,
+              };
+          
           const { data: insertedData, error: insertError } = await supabase
             .from("evaluation")
-            .insert({
-              user_id: currentUserId,
-              guest_id: null,
-              season_id: null, // MVP에서는 season_id 사용하지 않음
-              performance_id: performanceId,
-              star_rating: normalizedStar,
-              like_rating: normalizedLike,
-              comment: null,
-            } as any)
+            .insert(insertPayload as any)
             .select();
 
           if (insertError) {
@@ -406,8 +555,7 @@ export default function EvaluatePage() {
           }
 
           setHasEvaluatedInSession(true);
-          setTotalEvaluated((prev) => prev + 1);
-          return;
+          return true;
         }
 
         console.log("[Evaluation] ✅ Update success:", {
@@ -423,13 +571,7 @@ export default function EvaluatePage() {
         }));
 
         setHasEvaluatedInSession(true);
-        
-        // UPDATE 시에도 totalEvaluated는 변경되지 않지만, DB에서 다시 조회하여 정확한 값으로 업데이트
-        const { data: allEvaluations } = await supabase
-          .from("evaluation")
-          .select("id")
-          .eq("user_id", currentUserId);
-        setTotalEvaluated(allEvaluations?.length || 0);
+        return true;
       } else {
         // 새 평가 생성
         console.log("[Evaluation] ➕ INSERT path - Creating new evaluation", {
@@ -441,15 +583,25 @@ export default function EvaluatePage() {
           ratings: { star: normalizedStar, like: normalizedLike },
         });
         
-        const insertPayload = {
-          user_id: currentUserId,
-          guest_id: null,
-          season_id: null, // MVP에서는 season_id 사용하지 않음
-          performance_id: performanceId,
-          star_rating: normalizedStar,
-          like_rating: normalizedLike,
-          comment: null,
-        };
+        const insertPayload = isGuest
+          ? {
+              user_id: null,
+              guest_id: currentUserId,
+              season_id: null,
+              performance_id: performanceId,
+              star_rating: normalizedStar,
+              like_rating: normalizedLike,
+              comment: null,
+            }
+          : {
+              user_id: currentUserId,
+              guest_id: null,
+              season_id: null,
+              performance_id: performanceId,
+              star_rating: normalizedStar,
+              like_rating: normalizedLike,
+              comment: null,
+            };
         
         console.log("[Evaluation] ➕ INSERT payload (full):", JSON.stringify(insertPayload, null, 2));
         console.log("[Evaluation] ➕ INSERT payload (values check):", {
@@ -492,12 +644,24 @@ export default function EvaluatePage() {
             console.log("[Evaluation] Insert failed due to unique constraint, attempting UPDATE instead...");
             
             // 기존 평가 다시 조회
-            const { data: existingEvalRetry } = await supabase
-              .from("evaluation")
-              .select("*")
-              .eq("user_id", currentUserId)
-              .eq("performance_id", performanceId)
-              .maybeSingle();
+            let existingEvalRetry;
+            if (isGuest) {
+              const result = await supabase
+                .from("evaluation")
+                .select("*")
+                .eq("guest_id", currentUserId)
+                .eq("performance_id", performanceId)
+                .maybeSingle();
+              existingEvalRetry = result.data;
+            } else {
+              const result = await supabase
+                .from("evaluation")
+                .select("*")
+                .eq("user_id", currentUserId)
+                .eq("performance_id", performanceId)
+                .maybeSingle();
+              existingEvalRetry = result.data;
+            }
             
             if (existingEvalRetry) {
               const { data: updatedData, error: updateError } = await (supabase
@@ -528,13 +692,7 @@ export default function EvaluatePage() {
               }));
 
               setHasEvaluatedInSession(true);
-              
-              const { data: allEvaluations } = await supabase
-                .from("evaluation")
-                .select("id")
-                .eq("user_id", currentUserId);
-              setTotalEvaluated(allEvaluations?.length || 0);
-              return;
+              return true;
             }
           }
           
@@ -557,8 +715,7 @@ export default function EvaluatePage() {
         
         // 평가 저장 완료 (목록에서 제거하지 않음 - 최종 저장 전까지 유지)
         setHasEvaluatedInSession(true);
-        // 총 평가 수 실시간 업데이트
-        setTotalEvaluated((prev) => prev + 1);
+        return true;
       }
     } catch (error) {
       console.error("[Evaluation] ❌ CRITICAL ERROR in handleSaveEvaluation:", error);
@@ -577,6 +734,7 @@ export default function EvaluatePage() {
       performanceId,
       timestamp: new Date().toISOString(),
     });
+    return true;
   };
 
   const handleComplete = async () => {
@@ -597,10 +755,14 @@ export default function EvaluatePage() {
       if (evaluationData.starRating > 0 && evaluationData.likeRating > 0) {
         console.log("[Evaluation] 💾 Saving evaluation from handleComplete", { performanceId });
         try {
-          await handleSaveEvaluation(performanceId);
-          setHasEvaluatedInSession(true);
-          saveResults.push({ performanceId, success: true });
-          console.log("[Evaluation] ✅ Successfully saved evaluation", { performanceId });
+          const success = await handleSaveEvaluation(performanceId);
+          if (success) {
+            setHasEvaluatedInSession(true);
+            saveResults.push({ performanceId, success: true });
+            console.log("[Evaluation] ✅ Successfully saved evaluation", { performanceId });
+          } else {
+            saveResults.push({ performanceId, success: false, error: "Failed to save" });
+          }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           console.error("[Evaluation] ❌ Failed to save evaluation", {
@@ -624,7 +786,53 @@ export default function EvaluatePage() {
     console.log("[Evaluation] 🎬 handleComplete END");
   };
 
-  const handleFinalSave = () => {
+  // handleFinalSave는 더 이상 사용하지 않음 (checkAndShowCompleteModal에서 처리)
+
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    // 비로그인 상태에서 회원가입/로그인 완료 후에는 EvaluationCompleteModal을 표시하지 않음
+    // 로그인된 상태에서 평가를 완료했을 때만 EvaluationCompleteModal이 표시됨
+    // 여기서는 AuthModal만 닫고 평가 화면을 유지하거나, '내 평가' 화면으로 이동
+    router.push("/my-evaluations");
+  };
+
+
+  const handleCompleteModalConfirm = async () => {
+    // 실제 DB에서 총 평가 수를 조회하여 업데이트
+    try {
+      const supabase = createClient();
+      const user = await getCurrentUser();
+      
+      let totalCount = 0;
+      if (user) {
+        // 인증된 사용자: user_id 기준
+        const { data: allEvaluations } = await supabase
+          .from("evaluation")
+          .select("id")
+          .eq("user_id", user.id)
+          .is("guest_id", null);
+        totalCount = allEvaluations?.length || 0;
+      } else {
+        // Guest: guest_id 기준
+        const guestId = getGuestId();
+        if (guestId) {
+          const { data: allEvaluations } = await supabase
+            .from("evaluation")
+            .select("id")
+            .eq("guest_id", guestId)
+            .is("user_id", null);
+          totalCount = allEvaluations?.length || 0;
+        }
+      }
+      
+      // DB의 실제 총 평가 수로 업데이트
+      setTotalEvaluated(totalCount);
+      setClientTotalEvaluated(totalCount);
+    } catch (error) {
+      console.error("Failed to load total evaluations:", error);
+    }
+    
+    setShowCompleteModal(false);
     router.push("/my-evaluations");
   };
 
@@ -666,25 +874,35 @@ export default function EvaluatePage() {
     );
   }
 
-  // 모든 공연 평가 완료 시 (세션 중 평가를 완료한 경우에만 모달 표시)
   if (status === "ready" && performances.length === 0 && allPerformances.length > 0 && hasEvaluatedInSession) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="flex min-h-screen flex-col items-center justify-center px-4">
-          <div className="mb-6 text-center">
-            <p className="mb-2 text-lg font-semibold text-black">
-              모든 공연에 대한 평가를 완료했습니다.
-            </p>
-            <p className="text-sm text-zinc-600">
-              총 {totalEvaluated}개의 공연을 평가하셨습니다.
-            </p>
-          </div>
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-zinc-600">처리 중...</p>
+        {showAuthModal && (
+          <AuthModal
+            isOpen={showAuthModal}
+            onClose={() => {
+              setShowAuthModal(false);
+              // 팝업만 닫고 평가하기 화면 유지 (라우팅 없음)
+            }}
+            onSuccess={handleAuthSuccess}
+            totalEvaluations={totalEvaluated}
+            mode="signup"
+            onTotalUpdate={(count) => {
+              setTotalEvaluated(count);
+            }}
+          />
+        )}
+        {showCompleteModal && (
           <EvaluationCompleteModal
             totalCount={totalEvaluated}
-            onConfirm={handleFinalSave}
-            onClose={() => router.push("/")}
+            onConfirm={handleCompleteModalConfirm}
+            onClose={() => {
+              setShowCompleteModal(false);
+              // 팝업만 닫고 평가하기 화면 유지 (라우팅 없음)
+            }}
           />
-        </div>
+        )}
       </div>
     );
   }
@@ -710,7 +928,7 @@ export default function EvaluatePage() {
       {/* 상단 통계 */}
       <StatsBanner
         rank="상위 3%"
-        count={totalEvaluated}
+        count={clientTotalEvaluated}
       />
 
       {/* 스크롤 가능한 공연 카드 영역 */}
@@ -815,11 +1033,30 @@ export default function EvaluatePage() {
         </Button>
       </div>
 
+      {showAuthModal && (
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => {
+            setShowAuthModal(false);
+            // 팝업만 닫고 평가하기 화면 유지 (라우팅 없음)
+          }}
+          onSuccess={handleAuthSuccess}
+          totalEvaluations={totalEvaluated}
+          mode="signup"
+          onTotalUpdate={(count) => {
+            setTotalEvaluated(count);
+          }}
+        />
+      )}
+
       {showCompleteModal && (
         <EvaluationCompleteModal
           totalCount={totalEvaluated}
-          onConfirm={handleFinalSave}
-          onClose={() => setShowCompleteModal(false)}
+          onConfirm={handleCompleteModalConfirm}
+          onClose={() => {
+            setShowCompleteModal(false);
+            // 팝업만 닫고 평가하기 화면 유지
+          }}
         />
       )}
 

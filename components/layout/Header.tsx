@@ -1,17 +1,18 @@
 import React from "react";
-import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 /**
  * Header 컴포넌트
- * 화면 상단 헤더 (ID, 타이틀, 로그아웃)
+ * 화면 상단 헤더 (ID, 타이틀, 로그인/로그아웃)
  */
 export interface HeaderProps {
   userId?: string | null;
   title: string;
   subtitle?: string;
   onLogout?: () => void;
+  onLogin?: () => void;
   showLogout?: boolean;
+  showLogin?: boolean;
 }
 
 export default function Header({
@@ -19,7 +20,9 @@ export default function Header({
   title,
   subtitle,
   onLogout,
+  onLogin,
   showLogout = false,
+  showLogin = false,
 }: HeaderProps) {
   return (
     <div className="mb-6">
@@ -39,10 +42,18 @@ export default function Header({
         {showLogout && onLogout ? (
           <button
             onClick={onLogout}
-            className="text-sm text-zinc-600 hover:text-zinc-900"
+            className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
             aria-label="로그아웃"
           >
-            <LogOut className="h-5 w-5" />
+            로그아웃
+          </button>
+        ) : showLogin && onLogin ? (
+          <button
+            onClick={onLogin}
+            className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
+            aria-label="로그인"
+          >
+            로그인
           </button>
         ) : (
           <div className="w-16" />
