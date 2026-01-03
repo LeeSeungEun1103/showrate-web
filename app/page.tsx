@@ -40,19 +40,17 @@ export default function HomePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // 사용자 인증 상태 확인
+  // 사용자 인증 상태 확인 (선택적)
   useEffect(() => {
     async function checkAuth() {
       const user = await getCurrentUser();
       if (user) {
         setUserId(user.id.substring(0, 8));
       }
-      setIsCheckingAuth(false);
     }
     checkAuth();
-  }, [router]);
+  }, []);
 
   // 공연 목록 로드
   useEffect(() => {
@@ -194,8 +192,7 @@ export default function HomePage() {
     setFilteredPerformances(filtered);
   }, [performances, searchQuery, sortType]);
 
-  // 로딩 중이거나 인증 확인 중이면 아무것도 표시하지 않음
-  if (isCheckingAuth || isLoading) {
+  if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-zinc-600">로딩 중...</p>
@@ -203,20 +200,23 @@ export default function HomePage() {
     );
   }
 
-
   return (
     <div className="min-h-screen bg-white pb-20">
       <main className="mx-auto max-w-md px-4 py-6">
         {/* 헤더 */}
         <Header
           userId={userId || undefined}
-          title="전체 평가"
+          title="ShowRate"
           showLogout={!!userId}
+          showLogin={!userId}
           onLogout={async () => {
             await signOut();
             setUserId(null);
             setShowToast(true);
-            router.push("/landing");
+            router.refresh();
+          }}
+          onLogin={() => {
+            setShowLoginModal(true);
           }}
         />
 
